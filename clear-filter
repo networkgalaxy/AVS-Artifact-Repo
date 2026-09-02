@@ -1,0 +1,70 @@
+/**
+ * AVS Document Repository — "Reset everything" Office Script.
+ *
+ * OPTIONAL. The workbook is complete without it and contains no code; this is
+ * the one thing formulas genuinely cannot do. Adding it puts a real one-click
+ * button on the sheet that:
+ *
+ *   1. empties the search box,
+ *   2. sets the Scope dropdown back to All,
+ *   3. clears every slicer,
+ *   4. clears any AutoFilter left on the table.
+ *
+ * That covers both "give me a proper Clear button" and "clicking search should
+ * release the slicer" — a formula can read a slicer's effect but can never
+ * change one, so a script is the only way.
+ *
+ * It touches nothing but cells and filters in this workbook: no network calls,
+ * no external data, no other files.
+ *
+ * "When searching" (B8) is deliberately left alone. It is a preference, not a
+ * filter, so resetting it every time would undo a setting you chose on purpose.
+ *
+ * ── How to add it ────────────────────────────────────────────────────────────
+ *  1. Open the workbook in Excel for the Web (or Excel on Windows, M365).
+ *  2. Automate tab ▸ New Script.
+ *  3. Select everything in the editor and paste this file over it.
+ *  4. Rename it "Reset filters" and Save.
+ *  5. In the script's ⋯ menu choose "Add button" — a button appears on the
+ *     current sheet. Drag it next to the search box on Index.
+ *
+ * Needs a Microsoft 365 commercial licence with Office Scripts enabled by your
+ * tenant admin. Not available in Excel for Mac. If Automate is missing from the
+ * ribbon, Office Scripts is not switched on for your tenant and the built-in
+ * clears are the fallback: the CLEAR SEARCH bar on Index (click, then press
+ * Delete) and the funnel-with-a-cross icon in a slicer's top-right corner.
+ */
+function main(workbook: ExcelScript.Workbook) {
+  const index = workbook.getWorksheet("Index");
+
+  // The search box is the anchor of the merged range E6:H6, and Range.clear()
+  // on a merged cell fails with "There was an internal error while processing
+  // the request". Writing an empty string works and is equivalent: every
+  // formula reads this cell as TRIM(SearchBox & ""), so "" and a blank cell
+  // behave identically.
+  index.getRange("E6").setValue("");
+
+  // The Scope dropdown. "All" is always present in the data validation list,
+  // so this cannot leave an invalid entry behind. B6 is not merged.
+  index.getRange("B6").setValue("All");
+
+  // Every slicer in the workbook, however many have been added. Wrapped so a
+  // problem with one does not stop the search box and scope from resetting.
+  try {
+    for (const slicer of workbook.getSlicers()) {
+      slicer.clearFilters();
+    }
+  } catch (err) {
+    console.log("Could not clear a slicer: " + err);
+  }
+
+  // The table's own column filter arrows, in case one was left on.
+  try {
+    const table = workbook.getTable("tblDocuments");
+    if (table) {
+      table.getAutoFilter().clearCriteria();
+    }
+  } catch (err) {
+    console.log("No table filter to clear: " + err);
+  }
+}
